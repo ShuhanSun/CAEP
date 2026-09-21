@@ -110,3 +110,23 @@ def test_import_harbor_redacts_non_utf8_text_evidence():
         manifest = json.loads((bundle / "evidence-manifest.json").read_text())
         artifacts = {item["path"]: item for item in manifest["artifacts"]}
         assert artifacts["native/test-stderr.txt"]["sanitized"] is True
+
+
+def test_import_harbor_preserves_unmodified_non_utf8_text_evidence():
+    with tempfile.TemporaryDirectory() as td:
+        job = Path(td) / "job"
+        shutil.copytree(FIXTURE, job)
+
+        stderr = job / "trials" / "trial-01" / "verifier" / "test-stderr.txt"
+        stderr.parent.mkdir(parents=True, exist_ok=True)
+        stderr.write_bytes(b"status: ok\xff\n")
+
+        out = Path(td) / "runs"
+        bundle = import_harbor_job(job, out, success_threshold=1.0)[0]
+
+        copied = bundle / "native" / "test-stderr.txt"
+        assert copied.read_bytes() == b"status: ok\xff\n"
+
+        manifest = json.loads((bundle / "evidence-manifest.json").read_text())
+        artifacts = {item["path"]: item for item in manifest["artifacts"]}
+        assert "sanitized" not in artifacts["native/test-stderr.txt"]

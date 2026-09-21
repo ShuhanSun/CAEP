@@ -307,11 +307,16 @@ def import_harbor_job(job_dir: Path, out_dir: Path, success_threshold: float = 1
         def copy_redacted_text(src: Path, dst_name: str, role: str, required=False):
             if not src.is_file():
                 return
+            original_bytes = src.read_bytes()
             original_sha256 = sha256_file(src)
-            cleaned = redact_text(src.read_bytes().decode("utf-8", errors="replace"))
+            original_text = original_bytes.decode("utf-8", errors="surrogateescape")
+            cleaned = redact_text(original_text)
+            if cleaned == original_text:
+                copy_evidence(src, dst_name, role, required)
+                return
             dst = bundle / dst_name
             dst.parent.mkdir(parents=True, exist_ok=True)
-            dst.write_text(cleaned, encoding="utf-8")
+            dst.write_bytes(cleaned.encode("utf-8", errors="surrogateescape"))
             artifacts.append(
                 {
                     "path": dst_name,

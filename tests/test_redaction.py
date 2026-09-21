@@ -35,3 +35,8 @@ def test_redacts_sensitive_text_patterns():
     assert '"CODEX_AUTH_JSON": "<redacted>"' in cleaned
     assert 'token: <redacted>' in cleaned
     assert 'normal=value' in cleaned
+
+
+def test_redacts_text_without_changing_surrounding_whitespace():
+    cleaned = redact_text("token:  abc123  ")
+    assert cleaned == "token:  <redacted>  "

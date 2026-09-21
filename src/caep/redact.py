@@ -46,11 +46,16 @@ def redact_text(text: str) -> str:
         key = match.group(3)
         if _is_sensitive_key(key):
             value = match.group(6)
-            stripped = value.strip()
+            leading_len = len(value) - len(value.lstrip())
+            trailing_len = len(value) - len(value.rstrip())
+            leading = value[:leading_len]
+            trailing = value[len(value) - trailing_len:] if trailing_len else ""
+            core_end = len(value) - trailing_len if trailing_len else len(value)
+            core = value[leading_len:core_end]
             replacement = "<redacted>"
-            if len(stripped) >= 2 and stripped[0] in {"'", '"'} and stripped[-1] == stripped[0]:
-                replacement = f"{stripped[0]}<redacted>{stripped[0]}"
-            return f"{match.group(1)}{match.group(2)}{key}{match.group(4)}{match.group(5)}{replacement}"
+            if len(core) >= 2 and core[0] in {"'", '"'} and core[-1] == core[0]:
+                replacement = f"{core[0]}<redacted>{core[0]}"
+            return f"{match.group(1)}{match.group(2)}{key}{match.group(4)}{match.group(5)}{leading}{replacement}{trailing}"
         return match.group(0)
 
     return _KEY_VALUE.sub(replace_key_value, text)
