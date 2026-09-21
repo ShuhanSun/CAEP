@@ -9,7 +9,7 @@ _SENSITIVE_KEY = re.compile(
 )
 _ASSIGNMENT = re.compile(r"^\s*([^=]+?)\s*=\s*(.*)$", re.DOTALL)
 _KEY_VALUE = re.compile(
-    r'(?im)((?:^|[{\[,])\s*)(["\']?)([A-Za-z0-9_.-]*'
+    r'(?im)((?:^|\n|[{\[,])\s*)(["\']?)([A-Za-z0-9_.-]*'
     r"(?:api[_-]?key|token|secret|password|auth[_-]?json|credential)"
     r'[A-Za-z0-9_.-]*)(\2)(\s*[:=]\s*)((?:"(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\'|.*?))(?=(?:\s*[,}\]])|$)'
 )
