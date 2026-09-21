@@ -1,11 +1,21 @@
 {
-  "cost_coverage": 1,
+  "cost_coverage": 1.0,
   "cost_per_success_usd": 6.363333333333333,
   "k": 5,
   "known_cost_runs": 5,
   "observed_pass_at_k": 1,
   "protocol_version": "0.2-draft",
   "runs": 5,
+  "stability": {
+    "mixed_outcome_task_fraction": 1.0,
+    "outcome_class_counts": {
+      "consistent_failure": 0,
+      "consistent_success": 0,
+      "mixed_outcome": 1,
+      "no_runs": 0
+    },
+    "task_count": 1
+  },
   "success_rate": 0.6,
   "success_rate_ci95_wilson": [
     0.2307242812760128,
@@ -14,8 +24,12 @@
   "successful_runs": 3,
   "tasks": {
     "demo/reliability-task": {
+      "cost_cv": 0.344862156356685,
       "k": 5,
+      "latency_cv": 0.013730228760903837,
       "observed_pass_at_k": 1,
+      "outcome_class": "mixed_outcome",
+      "outcome_entropy_bits": 0.9709505944546686,
       "runs": 5,
       "success_rate": 0.6,
       "success_rate_ci95_wilson": [

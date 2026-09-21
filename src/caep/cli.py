@@ -5,7 +5,8 @@ import json
 from .harbor import import_harbor_job
 from .aggregate import aggregate
 from .verify import verify_bundle
-from .util import dump_json
+from .util import dump_json, load_json
+from .report import render_markdown
 
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="caep")
@@ -23,6 +24,10 @@ def main(argv=None):
     p = sub.add_parser("verify", help="Verify evidence hashes for one CAEP bundle")
     p.add_argument("bundle_dir", type=Path)
 
+    p = sub.add_parser("report", help="Render a Markdown reliability report from aggregate JSON")
+    p.add_argument("aggregate_json", type=Path)
+    p.add_argument("--out", type=Path)
+
     args = parser.parse_args(argv)
 
     if args.command == "import-harbor":
@@ -39,6 +44,12 @@ def main(argv=None):
         result = verify_bundle(args.bundle_dir)
         print(json.dumps(result, indent=2))
         return 0 if result["ok"] else 2
+    if args.command == "report":
+        report = render_markdown(load_json(args.aggregate_json))
+        if args.out:
+            args.out.write_text(report + "\n", encoding="utf-8")
+        print(report)
+        return 0
     return 1
 
 if __name__ == "__main__":

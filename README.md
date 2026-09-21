@@ -46,6 +46,22 @@ caep verify caep-runs/<run-id>
 
 No API keys are needed to import and analyze completed jobs.
 
+## Task stability profiles
+
+CAEP preserves repeated-run behavior instead of collapsing it into one pass/fail label:
+
+- `consistent_success` — all observed repetitions succeed.
+- `consistent_failure` — all observed repetitions fail.
+- `mixed_outcome` — the same task succeeds in some clean repetitions and fails in others.
+
+It also reports Bernoulli outcome entropy (0–1 bit), cost coefficient of variation, and latency coefficient of variation when enough measurements are available. These are descriptive statistics, not a composite quality score.
+
+Generate a Markdown report from aggregate output:
+
+```bash
+caep report aggregate.json --out reliability-report.md
+```
+
 ## Metrics in v0.2
 
 For a comparable set of repeated runs:

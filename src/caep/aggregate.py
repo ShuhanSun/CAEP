@@ -1,8 +1,9 @@
 from __future__ import annotations
-from dataclasses import dataclass
 from math import sqrt
 from pathlib import Path
 from .util import load_json
+from .stability import outcome_profile, coefficient_of_variation
+
 
 def wilson_interval(successes: int, n: int, z: float = 1.959963984540054):
     if n <= 0:
@@ -13,18 +14,19 @@ def wilson_interval(successes: int, n: int, z: float = 1.959963984540054):
     half = (z * sqrt((p*(1-p)/n) + (z*z)/(4*n*n))) / denom
     return [max(0.0, center-half), min(1.0, center+half)]
 
+
 def discover_results(root: Path):
     if (root / "result.json").is_file():
         yield root / "result.json"
         return
     for p in sorted(root.rglob("result.json")):
-        # CAEP result files are identified by protocol_version.
         try:
             obj = load_json(p)
         except Exception:
             continue
         if obj.get("protocol_version") == "0.2-draft":
             yield p
+
 
 def aggregate(root: Path):
     rows = [load_json(p) for p in discover_results(root)]
@@ -45,9 +47,19 @@ def aggregate(root: Path):
         tasks.setdefault(tid, []).append(r)
 
     task_summaries = {}
+    class_counts = {
+        "consistent_success": 0,
+        "consistent_failure": 0,
+        "mixed_outcome": 0,
+        "no_runs": 0,
+    }
     for tid, rr in sorted(tasks.items()):
         tn = len(rr)
         ts = sum(bool(x.get("success")) for x in rr)
+        profile = outcome_profile(ts, tn)
+        class_counts[profile["outcome_class"]] += 1
+        costs = [x.get("usage", {}).get("total_cost_usd") for x in rr]
+        latencies = [x.get("timing", {}).get("wall_time_seconds") for x in rr]
         task_summaries[tid] = {
             "runs": tn,
             "successes": ts,
@@ -55,7 +67,14 @@ def aggregate(root: Path):
             "observed_pass_at_k": (1 if ts > 0 else 0) if tn else None,
             "k": tn,
             "success_rate_ci95_wilson": wilson_interval(ts, tn),
+            "outcome_class": profile["outcome_class"],
+            "outcome_entropy_bits": profile["outcome_entropy_bits"],
+            "cost_cv": coefficient_of_variation(costs),
+            "latency_cv": coefficient_of_variation(latencies),
         }
+
+    task_count = len(task_summaries)
+    mixed_fraction = (class_counts["mixed_outcome"] / task_count) if task_count else None
 
     return {
         "protocol_version": "0.2-draft",
@@ -69,5 +88,10 @@ def aggregate(root: Path):
         "cost_coverage": (len(known_cost_rows)/n if n else None),
         "total_known_cost_usd": total_known_cost if known_cost_rows else None,
         "cost_per_success_usd": cps,
+        "stability": {
+            "task_count": task_count,
+            "outcome_class_counts": class_counts,
+            "mixed_outcome_task_fraction": mixed_fraction,
+        },
         "tasks": task_summaries,
     }
