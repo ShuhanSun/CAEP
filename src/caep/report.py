@@ -19,6 +19,7 @@ def render_markdown(aggregate: dict) -> str:
         f"- Successful runs: {aggregate.get('successful_runs', 0)}",
         f"- Success rate: {_pct(aggregate.get('success_rate'))}",
         f"- Cost coverage: {_pct(aggregate.get('cost_coverage'))}",
+        f"- Mean known-cost run cost: {_money(aggregate.get('mean_known_run_cost_usd'))}",
         f"- Cost per success: {_money(aggregate.get('cost_per_success_usd'))}",
         f"- Mixed-outcome task fraction: {_pct(aggregate.get('stability', {}).get('mixed_outcome_task_fraction'))}",
         "",

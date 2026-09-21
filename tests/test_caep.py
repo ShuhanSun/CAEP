@@ -1,4 +1,6 @@
 from pathlib import Path
+import json
+import shutil
 import tempfile
 from caep.harbor import import_harbor_job
 from caep.aggregate import aggregate
@@ -19,6 +21,7 @@ def test_import_aggregate_and_verify():
         assert a["successful_runs"] == 3
         assert abs(a["success_rate"] - 0.6) < 1e-12
         assert abs(a["total_known_cost_usd"] - 19.09) < 1e-9
+        assert abs(a["mean_known_run_cost_usd"] - (19.09 / 5)) < 1e-9
         assert abs(a["cost_per_success_usd"] - (19.09/3)) < 1e-9
         assert a["observed_pass_at_k"] == 1
         assert a["k"] == 5
@@ -59,4 +62,101 @@ def test_aggregate_exposes_task_stability_and_report():
         assert task["cost_cv"] is not None
         report = render_markdown(a)
         assert "mixed_outcome" in report
+        assert "Mean known-cost run cost" in report
         assert "Cost per success" in report
+
+
+def test_import_harbor_redacts_portable_bundle_evidence():
+    with tempfile.TemporaryDirectory() as td:
+        job = Path(td) / "job"
+        shutil.copytree(FIXTURE, job)
+
+        trajectory = job / "trials" / "trial-01" / "agent" / "trajectory.json"
+        obj = json.loads(trajectory.read_text())
+        obj["env"] = {"OPENAI_API_KEY": "sk-secret"}
+        trajectory.write_text(json.dumps(obj), encoding="utf-8")
+
+        stdout = job / "trials" / "trial-01" / "verifier" / "test-stdout.txt"
+        stdout.write_text('token: abc123\nsafe=value\n', encoding="utf-8")
+
+        out = Path(td) / "runs"
+        bundle = import_harbor_job(job, out, success_threshold=1.0)[0]
+
+        redacted_trajectory = json.loads((bundle / "native" / "trajectory.json").read_text())
+        assert redacted_trajectory["env"]["OPENAI_API_KEY"] == "<redacted>"
+        assert redacted_trajectory["final_metrics"]["total_prompt_tokens"] == 10000
+        assert redacted_trajectory["final_metrics"]["total_completion_tokens"] == 1000
+        assert redacted_trajectory["final_metrics"]["total_cached_tokens"] == 2000
+        assert (bundle / "native" / "test-stdout.txt").read_text(encoding="utf-8") == "token: <redacted>\nsafe=value\n"
+
+        manifest = json.loads((bundle / "evidence-manifest.json").read_text())
+        artifacts = {item["path"]: item for item in manifest["artifacts"]}
+        assert artifacts["native/trajectory.json"]["sanitized"] is True
+        assert artifacts["native/test-stdout.txt"]["sanitized"] is True
+
+
+def test_import_harbor_redacts_non_utf8_text_evidence():
+    with tempfile.TemporaryDirectory() as td:
+        job = Path(td) / "job"
+        shutil.copytree(FIXTURE, job)
+
+        stderr = job / "trials" / "trial-01" / "verifier" / "test-stderr.txt"
+        stderr.parent.mkdir(parents=True, exist_ok=True)
+        stderr.write_bytes(b"token: abc\xff123\n")
+
+        out = Path(td) / "runs"
+        bundle = import_harbor_job(job, out, success_threshold=1.0)[0]
+
+        copied = bundle / "native" / "test-stderr.txt"
+        assert copied.read_text(encoding="utf-8") == "token: <redacted>\n"
+
+        manifest = json.loads((bundle / "evidence-manifest.json").read_text())
+        artifacts = {item["path"]: item for item in manifest["artifacts"]}
+        assert artifacts["native/test-stderr.txt"]["sanitized"] is True
+
+
+def test_import_harbor_preserves_unmodified_non_utf8_text_evidence():
+    with tempfile.TemporaryDirectory() as td:
+        job = Path(td) / "job"
+        shutil.copytree(FIXTURE, job)
+
+        stderr = job / "trials" / "trial-01" / "verifier" / "test-stderr.txt"
+        stderr.parent.mkdir(parents=True, exist_ok=True)
+        stderr.write_bytes(b"status: ok\xff\n")
+
+        out = Path(td) / "runs"
+        bundle = import_harbor_job(job, out, success_threshold=1.0)[0]
+
+        copied = bundle / "native" / "test-stderr.txt"
+        assert copied.read_bytes() == b"status: ok\xff\n"
+
+        manifest = json.loads((bundle / "evidence-manifest.json").read_text())
+        artifacts = {item["path"]: item for item in manifest["artifacts"]}
+        assert "sanitized" not in artifacts["native/test-stderr.txt"]
+
+
+
+def test_import_harbor_preserves_malformed_json_evidence_with_text_fallback():
+    with tempfile.TemporaryDirectory() as td:
+        job = Path(td) / "job"
+        shutil.copytree(FIXTURE, job)
+
+        trajectory = job / "trials" / "trial-01" / "agent" / "trajectory.json"
+        trajectory.write_text(
+            '{"message":"broken", "token":"secret", trailing',
+            encoding="utf-8",
+        )
+
+        out = Path(td) / "runs"
+        bundle = import_harbor_job(job, out, success_threshold=1.0)[0]
+
+        copied = bundle / "native" / "trajectory.json"
+        text = copied.read_text(encoding="utf-8")
+        assert '"token":"<redacted>"' in text
+        assert "secret" not in text
+
+        manifest = json.loads((bundle / "evidence-manifest.json").read_text())
+        artifacts = {item["path"]: item for item in manifest["artifacts"]}
+        trajectory_artifact = artifacts["native/trajectory.json"]
+        assert trajectory_artifact["sanitized"] is True
+        assert trajectory_artifact["sanitization_mode"] == "text_fallback"

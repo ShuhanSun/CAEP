@@ -35,6 +35,7 @@ def aggregate(root: Path):
 
     known_cost_rows = [r for r in rows if r.get("usage", {}).get("total_cost_usd") is not None]
     total_known_cost = sum(r["usage"]["total_cost_usd"] for r in known_cost_rows)
+    mean_known_run_cost = (total_known_cost / len(known_cost_rows)) if known_cost_rows else None
     full_cost_coverage = len(known_cost_rows) == n
 
     cps = None
@@ -87,6 +88,7 @@ def aggregate(root: Path):
         "known_cost_runs": len(known_cost_rows),
         "cost_coverage": (len(known_cost_rows)/n if n else None),
         "total_known_cost_usd": total_known_cost if known_cost_rows else None,
+        "mean_known_run_cost_usd": mean_known_run_cost,
         "cost_per_success_usd": cps,
         "stability": {
             "task_count": task_count,

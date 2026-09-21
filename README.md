@@ -67,11 +67,13 @@ caep report aggregate.json --out reliability-report.md
 For a comparable set of repeated runs:
 
 - `success_rate = successful_runs / total_runs`
+- `mean_known_run_cost_usd = sum(cost of known-cost runs) / known_cost_runs`
 - `observed_pass_at_k = 1` when at least one of the observed k runs succeeds
 - `cost_per_success = sum(cost of ALL runs) / successful_runs`
 - Wilson 95% confidence interval for success rate when `n > 0`
 
 **Failed runs remain in the cost numerator.**
+When cost coverage is 100%, `mean_known_run_cost_usd` is the nominal per-run cost for repeated-run comparisons.
 
 CAEP deliberately does not emit a single composite "reliability score."
 
