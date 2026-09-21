@@ -50,6 +50,8 @@ After the run:
 - `experiments/output/report/aggregate.json` contains machine-readable repeated-run statistics.
 - `experiments/output/report/reliability-report.md` contains the human-readable report.
 
+Use `mean_known_run_cost_usd` (shown in the report as **Mean known-cost run cost**) as the pilot's nominal run cost only when cost coverage is 100%.
+
 ## Pilot decision rule
 
 Scale only if the pilot shows at least one of these signals:

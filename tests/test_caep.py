@@ -62,7 +62,7 @@ def test_aggregate_exposes_task_stability_and_report():
         assert task["cost_cv"] is not None
         report = render_markdown(a)
         assert "mixed_outcome" in report
-        assert "Nominal run cost" in report
+        assert "Mean known-cost run cost" in report
         assert "Cost per success" in report
 
 
