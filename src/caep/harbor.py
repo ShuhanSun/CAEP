@@ -287,11 +287,30 @@ def import_harbor_job(job_dir: Path, out_dir: Path, success_threshold: float = 1
             if not src.is_file():
                 return
             original_sha256 = sha256_file(src)
+            dst = bundle / dst_name
             try:
                 obj = load_json(src)
             except Exception:
+                # Do not silently drop malformed JSON evidence. Preserve the
+                # original bytes when possible while still applying text-level
+                # credential redaction as a safe fallback.
+                original_bytes = src.read_bytes()
+                original_text = original_bytes.decode("utf-8", errors="surrogateescape")
+                cleaned = redact_text(original_text)
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                dst.write_bytes(cleaned.encode("utf-8", errors="surrogateescape"))
+                artifacts.append(
+                    {
+                        "path": dst_name,
+                        "sha256": sha256_file(dst),
+                        "source_sha256": original_sha256,
+                        "role": role,
+                        "required_for_judgment": bool(required),
+                        "sanitized": True,
+                        "sanitization_mode": "text_fallback",
+                    }
+                )
                 return
-            dst = bundle / dst_name
             dump_json(dst, redact_json(obj))
             artifacts.append(
                 {
