@@ -84,6 +84,9 @@ def test_import_harbor_redacts_portable_bundle_evidence():
 
         redacted_trajectory = json.loads((bundle / "native" / "trajectory.json").read_text())
         assert redacted_trajectory["env"]["OPENAI_API_KEY"] == "<redacted>"
+        assert redacted_trajectory["final_metrics"]["total_prompt_tokens"] == 10000
+        assert redacted_trajectory["final_metrics"]["total_completion_tokens"] == 1000
+        assert redacted_trajectory["final_metrics"]["total_cached_tokens"] == 2000
         assert (bundle / "native" / "test-stdout.txt").read_text(encoding="utf-8") == "token: <redacted>\nsafe=value\n"
 
         manifest = json.loads((bundle / "evidence-manifest.json").read_text())
@@ -130,3 +133,30 @@ def test_import_harbor_preserves_unmodified_non_utf8_text_evidence():
         manifest = json.loads((bundle / "evidence-manifest.json").read_text())
         artifacts = {item["path"]: item for item in manifest["artifacts"]}
         assert "sanitized" not in artifacts["native/test-stderr.txt"]
+
+
+
+def test_import_harbor_preserves_malformed_json_evidence_with_text_fallback():
+    with tempfile.TemporaryDirectory() as td:
+        job = Path(td) / "job"
+        shutil.copytree(FIXTURE, job)
+
+        trajectory = job / "trials" / "trial-01" / "agent" / "trajectory.json"
+        trajectory.write_text(
+            '{"message":"broken", "token":"secret", trailing',
+            encoding="utf-8",
+        )
+
+        out = Path(td) / "runs"
+        bundle = import_harbor_job(job, out, success_threshold=1.0)[0]
+
+        copied = bundle / "native" / "trajectory.json"
+        text = copied.read_text(encoding="utf-8")
+        assert '"token":"<redacted>"' in text
+        assert "secret" not in text
+
+        manifest = json.loads((bundle / "evidence-manifest.json").read_text())
+        artifacts = {item["path"]: item for item in manifest["artifacts"]}
+        trajectory_artifact = artifacts["native/trajectory.json"]
+        assert trajectory_artifact["sanitized"] is True
+        assert trajectory_artifact["sanitization_mode"] == "text_fallback"
