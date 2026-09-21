@@ -135,9 +135,23 @@ def _balanced_value_end(text: str, start: int) -> int:
     return len(text)
 
 
-def _scalar_value_end(text: str, start: int) -> int:
+def _scalar_value_end(text: str, start: int, *, allow_spaces: bool = False) -> int:
     i = start
-    while i < len(text) and text[i] not in "\r\n\t ,;}])\"'":
+    while i < len(text):
+        ch = text[i]
+        if ch in "\r\n,;}])\"'":
+            break
+        if ch in " \t":
+            if not allow_spaces:
+                break
+            next_nonspace = i
+            while next_nonspace < len(text) and text[next_nonspace] in " \t":
+                next_nonspace += 1
+            # Keep spaces that are part of a credential value (for example
+            # "Authorization: Bearer ..."), but stop before the next key/value
+            # field when parsing a log line.
+            if _KEY_VALUE_START.match(text, next_nonspace):
+                break
         i += 1
     return i
 
@@ -179,7 +193,15 @@ def redact_text(text: str) -> str:
             end = _balanced_value_end(text, start)
             replacement = '"<redacted>"'
         else:
-            end = _scalar_value_end(text, start)
+            normalized_key = _normalized_key(match.group("key"))
+            end = _scalar_value_end(
+                text,
+                start,
+                allow_spaces=(
+                    normalized_key == "authorization"
+                    or normalized_key.endswith("_authorization")
+                ),
+            )
             replacement = "<redacted>"
 
         output.append(replacement)
