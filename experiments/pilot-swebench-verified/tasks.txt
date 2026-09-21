@@ -1,0 +1,5 @@
+swe-bench/django__django-15957
+swe-bench/matplotlib__matplotlib-24627
+swe-bench/sympy__sympy-23824
+swe-bench/scikit-learn__scikit-learn-11310
+swe-bench/sympy__sympy-16886

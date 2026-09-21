@@ -9,3 +9,6 @@ build/
 .DS_Store
 .env
 .env.*
+jobs/
+caep-runs/
+experiments/output/
