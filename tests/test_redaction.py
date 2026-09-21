@@ -97,3 +97,14 @@ def test_redacts_credentials_embedded_in_json_strings():
     assert cleaned["message"] == "INFO token=<redacted>"
     assert cleaned["command"] == "export OPENAI_API_KEY=<redacted>"
     assert cleaned["usage"] == "total_prompt_tokens=100"
+
+
+
+def test_redacts_authorization_bearer_value():
+    cleaned = redact_text("Authorization: Bearer abc.def.ghi")
+    assert cleaned == "Authorization: <redacted>"
+
+
+def test_authorization_redaction_stops_before_next_field():
+    cleaned = redact_text("Authorization: Bearer abc next=value")
+    assert cleaned == "Authorization: <redacted> next=value"
