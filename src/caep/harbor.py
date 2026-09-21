@@ -3,7 +3,7 @@ from pathlib import Path
 import shutil
 from typing import Any
 
-from .redact import redact_json
+from .redact import redact_json, redact_text
 from .util import load_json, dump_json, sha256_file, safe_id
 
 
@@ -304,8 +304,30 @@ def import_harbor_job(job_dir: Path, out_dir: Path, success_threshold: float = 1
                 }
             )
 
+        def copy_redacted_text(src: Path, dst_name: str, role: str, required=False):
+            if not src.is_file():
+                return
+            original_sha256 = sha256_file(src)
+            try:
+                cleaned = redact_text(src.read_text(encoding="utf-8"))
+            except Exception:
+                return
+            dst = bundle / dst_name
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            dst.write_text(cleaned, encoding="utf-8")
+            artifacts.append(
+                {
+                    "path": dst_name,
+                    "sha256": sha256_file(dst),
+                    "source_sha256": original_sha256,
+                    "role": role,
+                    "required_for_judgment": bool(required),
+                    "sanitized": True,
+                }
+            )
+
         if trajectory_path:
-            copy_evidence(trajectory_path, "native/trajectory.json", "atif_trajectory", False)
+            copy_redacted_json(trajectory_path, "native/trajectory.json", "atif_trajectory", False)
 
         copy_redacted_json(
             trial_dir / "config.json",
@@ -331,13 +353,13 @@ def import_harbor_job(job_dir: Path, out_dir: Path, success_threshold: float = 1
             "verifier_reward",
             True,
         )
-        copy_evidence(
+        copy_redacted_text(
             trial_dir / "verifier" / "test-stdout.txt",
             "native/test-stdout.txt",
             "verifier_stdout",
             False,
         )
-        copy_evidence(
+        copy_redacted_text(
             trial_dir / "verifier" / "test-stderr.txt",
             "native/test-stderr.txt",
             "verifier_stderr",

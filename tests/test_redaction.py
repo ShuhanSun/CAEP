@@ -1,4 +1,4 @@
-from caep.redact import redact_json
+from caep.redact import redact_json, redact_text
 
 
 def test_redacts_sensitive_dict_keys():
@@ -21,3 +21,17 @@ def test_redacts_assignment_strings_in_lists():
     raw = ["OPENAI_API_KEY=sk-secret", "FOO=bar"]
     cleaned = redact_json(raw)
     assert cleaned == ["OPENAI_API_KEY=<redacted>", "FOO=bar"]
+
+
+def test_redacts_sensitive_text_patterns():
+    raw = '\n'.join([
+        'OPENAI_API_KEY=sk-secret',
+        '"CODEX_AUTH_JSON": "{secret}"',
+        'token: abc123',
+        'normal=value',
+    ])
+    cleaned = redact_text(raw)
+    assert 'OPENAI_API_KEY=<redacted>' in cleaned
+    assert '"CODEX_AUTH_JSON": "<redacted>"' in cleaned
+    assert 'token: <redacted>' in cleaned
+    assert 'normal=value' in cleaned

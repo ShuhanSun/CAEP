@@ -46,7 +46,7 @@ Outputs are written under `experiments/output/`, which is gitignored.
 
 After the run:
 
-- `experiments/output/caep-runs/` contains portable per-run CAEP evidence bundles.
+- `experiments/output/caep-runs/` contains portable per-run CAEP evidence bundles with credential-bearing JSON and text evidence redacted for sharing.
 - `experiments/output/report/aggregate.json` contains machine-readable repeated-run statistics.
 - `experiments/output/report/reliability-report.md` contains the human-readable report.
 
@@ -55,7 +55,7 @@ After the run:
 Scale only if the pilot shows at least one of these signals:
 
 1. mixed outcomes occur on one or more tasks;
-2. cost-per-success materially differs from nominal successful-run cost;
+2. cost-per-success materially differs from nominal run cost;
 3. repeated runs expose meaningful cost or latency variance;
 4. execution provenance reveals comparability problems worth formalizing.
 

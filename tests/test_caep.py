@@ -1,4 +1,6 @@
 from pathlib import Path
+import json
+import shutil
 import tempfile
 from caep.harbor import import_harbor_job
 from caep.aggregate import aggregate
@@ -19,6 +21,7 @@ def test_import_aggregate_and_verify():
         assert a["successful_runs"] == 3
         assert abs(a["success_rate"] - 0.6) < 1e-12
         assert abs(a["total_known_cost_usd"] - 19.09) < 1e-9
+        assert abs(a["mean_known_run_cost_usd"] - (19.09 / 5)) < 1e-9
         assert abs(a["cost_per_success_usd"] - (19.09/3)) < 1e-9
         assert a["observed_pass_at_k"] == 1
         assert a["k"] == 5
@@ -59,4 +62,31 @@ def test_aggregate_exposes_task_stability_and_report():
         assert task["cost_cv"] is not None
         report = render_markdown(a)
         assert "mixed_outcome" in report
+        assert "Nominal run cost" in report
         assert "Cost per success" in report
+
+
+def test_import_harbor_redacts_portable_bundle_evidence():
+    with tempfile.TemporaryDirectory() as td:
+        job = Path(td) / "job"
+        shutil.copytree(FIXTURE, job)
+
+        trajectory = job / "trials" / "trial-01" / "agent" / "trajectory.json"
+        obj = json.loads(trajectory.read_text())
+        obj["env"] = {"OPENAI_API_KEY": "sk-secret"}
+        trajectory.write_text(json.dumps(obj), encoding="utf-8")
+
+        stdout = job / "trials" / "trial-01" / "verifier" / "test-stdout.txt"
+        stdout.write_text('token: abc123\nsafe=value\n', encoding="utf-8")
+
+        out = Path(td) / "runs"
+        bundle = import_harbor_job(job, out, success_threshold=1.0)[0]
+
+        redacted_trajectory = json.loads((bundle / "native" / "trajectory.json").read_text())
+        assert redacted_trajectory["env"]["OPENAI_API_KEY"] == "<redacted>"
+        assert (bundle / "native" / "test-stdout.txt").read_text(encoding="utf-8") == "token: <redacted>\nsafe=value\n"
+
+        manifest = json.loads((bundle / "evidence-manifest.json").read_text())
+        artifacts = {item["path"]: item for item in manifest["artifacts"]}
+        assert artifacts["native/trajectory.json"]["sanitized"] is True
+        assert artifacts["native/test-stdout.txt"]["sanitized"] is True
