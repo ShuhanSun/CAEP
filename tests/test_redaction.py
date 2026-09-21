@@ -40,3 +40,8 @@ def test_redacts_sensitive_text_patterns():
 def test_redacts_text_without_changing_surrounding_whitespace():
     cleaned = redact_text("token:  abc123  ")
     assert cleaned == "token:  <redacted>  "
+
+
+def test_redacts_inline_structured_text_without_breaking_delimiters():
+    cleaned = redact_text('prefix {"token":"abc","safe":"ok"} suffix')
+    assert cleaned == 'prefix {"token":"<redacted>","safe":"ok"} suffix'
