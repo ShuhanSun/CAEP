@@ -3,24 +3,193 @@ from __future__ import annotations
 import re
 from typing import Any
 
-_SENSITIVE_KEY = re.compile(
-    r"(api[_-]?key|token|secret|password|auth[_-]?json|credential)",
-    re.IGNORECASE,
+
+_KEY_VALUE_START = re.compile(
+    r"""(?ix)
+    (?<![A-Za-z0-9_.-])
+    (?P<quote>["']?)
+    (?P<key>[A-Za-z_][A-Za-z0-9_.-]*)
+    (?P=quote)
+    (?P<sep>\s*[:=]\s*)
+    """
 )
-_ASSIGNMENT = re.compile(r"^\s*([^=]+?)\s*=\s*(.*)$", re.DOTALL)
-_KEY_VALUE = re.compile(
-    r'(?im)((?:^|\n|[{\[,])\s*)(["\']?)([A-Za-z0-9_.-]*'
-    r"(?:api[_-]?key|token|secret|password|auth[_-]?json|credential)"
-    r'[A-Za-z0-9_.-]*)(\2)(\s*[:=]\s*)((?:"(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\'|.*?))(?=(?:\s*[,}\]])|$)'
-)
+
+
+def _normalized_key(key: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", key.lower()).strip("_")
 
 
 def _is_sensitive_key(key: str) -> bool:
-    return bool(_SENSITIVE_KEY.search(key))
+    """Return True for credential-bearing keys, not token-usage metrics."""
+    normalized = _normalized_key(key)
+    if not normalized:
+        return False
+
+    # Evaluation evidence frequently contains token counters. These must survive
+    # sanitization even though their names contain the word "token".
+    if (
+        normalized == "tokens"
+        or normalized.endswith("_tokens")
+        or normalized.startswith("tokens_")
+        or normalized == "token_count"
+        or normalized.endswith("_token_count")
+        or normalized.startswith("token_count_")
+        or normalized in {"token_usage", "token_usage_count"}
+    ):
+        return False
+
+    if normalized in {
+        "token",
+        "secret",
+        "password",
+        "credential",
+        "credentials",
+        "api_key",
+        "apikey",
+        "auth_json",
+        "authorization",
+        "client_secret",
+        "access_token",
+        "refresh_token",
+        "id_token",
+        "session_token",
+        "bearer_token",
+        "private_key",
+    }:
+        return True
+
+    if normalized.endswith(
+        (
+            "_api_key",
+            "_apikey",
+            "_secret",
+            "_password",
+            "_credential",
+            "_credentials",
+            "_auth_json",
+            "_authorization",
+            "_client_secret",
+            "_access_token",
+            "_refresh_token",
+            "_id_token",
+            "_session_token",
+            "_bearer_token",
+            "_private_key",
+        )
+    ):
+        return True
+
+    # Catch provider-specific credentials such as GITHUB_TOKEN while still
+    # excluding *_tokens and *_token_count above.
+    return normalized.endswith("_token")
+
+
+def _quoted_value_end(text: str, start: int) -> int:
+    quote = text[start]
+    i = start + 1
+    while i < len(text):
+        if text[i] == "\\":
+            i += 2
+            continue
+        if text[i] == quote:
+            return i + 1
+        i += 1
+    return len(text)
+
+
+def _balanced_value_end(text: str, start: int) -> int:
+    pairs = {"[": "]", "{": "}"}
+    stack = [pairs[text[start]]]
+    quote: str | None = None
+    i = start + 1
+
+    while i < len(text):
+        ch = text[i]
+        if quote is not None:
+            if ch == "\\":
+                i += 2
+                continue
+            if ch == quote:
+                quote = None
+            i += 1
+            continue
+
+        if ch in {'"', "'"}:
+            quote = ch
+            i += 1
+            continue
+        if ch in pairs:
+            stack.append(pairs[ch])
+            i += 1
+            continue
+        if ch == stack[-1]:
+            stack.pop()
+            i += 1
+            if not stack:
+                return i
+            continue
+        i += 1
+
+    # Fail closed for malformed structured values: redact through EOF rather
+    # than risking a partial credential leak.
+    return len(text)
+
+
+def _scalar_value_end(text: str, start: int) -> int:
+    i = start
+    while i < len(text) and text[i] not in "\r\n\t ,;}])\"'":
+        i += 1
+    return i
+
+
+def redact_text(text: str) -> str:
+    """Redact credential-bearing key/value pairs from arbitrary text evidence.
+
+    The scanner accepts ordinary log prefixes, preserves quoted scalar syntax,
+    and replaces structured secret values with a JSON-compatible string marker.
+    """
+    output: list[str] = []
+    pos = 0
+
+    while True:
+        match = _KEY_VALUE_START.search(text, pos)
+        if match is None:
+            output.append(text[pos:])
+            break
+
+        output.append(text[pos:match.end()])
+        if not _is_sensitive_key(match.group("key")):
+            pos = match.end()
+            continue
+
+        start = match.end()
+        if start >= len(text):
+            output.append("<redacted>")
+            pos = start
+            continue
+
+        first = text[start]
+        if first in {'"', "'"}:
+            end = _quoted_value_end(text, start)
+            if end > start + 1 and text[end - 1] == first:
+                replacement = f"{first}<redacted>{first}"
+            else:
+                replacement = f"{first}<redacted>"
+        elif first in "[{":
+            end = _balanced_value_end(text, start)
+            replacement = '"<redacted>"'
+        else:
+            end = _scalar_value_end(text, start)
+            replacement = "<redacted>"
+
+        output.append(replacement)
+        pos = end
+
+    return "".join(output)
 
 
 def redact_json(value: Any) -> Any:
-    """Recursively redact common credential-bearing fields."""
+    """Recursively redact credential-bearing fields and strings."""
     if isinstance(value, dict):
         out = {}
         for key, item in value.items():
@@ -32,30 +201,7 @@ def redact_json(value: Any) -> Any:
     if isinstance(value, list):
         return [redact_json(item) for item in value]
     if isinstance(value, str):
-        match = _ASSIGNMENT.match(value)
-        if match and _is_sensitive_key(match.group(1)):
-            return f"{match.group(1)}=<redacted>"
-        return value
+        # Trajectories can embed shell commands and verifier output inside JSON
+        # strings, so sanitize those strings as text too.
+        return redact_text(value)
     return value
-
-
-def redact_text(text: str) -> str:
-    """Redact common credential-bearing key/value patterns from text evidence."""
-
-    def replace_key_value(match: re.Match[str]) -> str:
-        key = match.group(3)
-        if _is_sensitive_key(key):
-            value = match.group(6)
-            leading_len = len(value) - len(value.lstrip())
-            trailing_len = len(value) - len(value.rstrip())
-            leading = value[:leading_len]
-            trailing = value[len(value) - trailing_len:] if trailing_len else ""
-            core_end = len(value) - trailing_len if trailing_len else len(value)
-            core = value[leading_len:core_end]
-            replacement = "<redacted>"
-            if len(core) >= 2 and core[0] in {"'", '"'} and core[-1] == core[0]:
-                replacement = f"{core[0]}<redacted>{core[0]}"
-            return f"{match.group(1)}{match.group(2)}{key}{match.group(4)}{match.group(5)}{leading}{replacement}{trailing}"
-        return match.group(0)
-
-    return _KEY_VALUE.sub(replace_key_value, text)
