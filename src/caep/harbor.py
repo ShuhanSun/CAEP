@@ -311,6 +311,7 @@ def import_harbor_job(job_dir: Path, out_dir: Path, success_threshold: float = 1
             try:
                 cleaned = redact_text(src.read_text(encoding="utf-8"))
             except Exception:
+                copy_evidence(src, dst_name, role, required)
                 return
             dst = bundle / dst_name
             dst.parent.mkdir(parents=True, exist_ok=True)
