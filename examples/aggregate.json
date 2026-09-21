@@ -1,0 +1,29 @@
+{
+  "cost_coverage": 1,
+  "cost_per_success_usd": 6.363333333333333,
+  "k": 5,
+  "known_cost_runs": 5,
+  "observed_pass_at_k": 1,
+  "protocol_version": "0.2-draft",
+  "runs": 5,
+  "success_rate": 0.6,
+  "success_rate_ci95_wilson": [
+    0.2307242812760128,
+    0.882379225767352
+  ],
+  "successful_runs": 3,
+  "tasks": {
+    "demo/reliability-task": {
+      "k": 5,
+      "observed_pass_at_k": 1,
+      "runs": 5,
+      "success_rate": 0.6,
+      "success_rate_ci95_wilson": [
+        0.2307242812760128,
+        0.882379225767352
+      ],
+      "successes": 3
+    }
+  },
+  "total_known_cost_usd": 19.09
+}

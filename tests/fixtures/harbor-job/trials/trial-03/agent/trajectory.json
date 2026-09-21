@@ -1,0 +1,16 @@
+{
+  "schema_version": "ATIF-v1.8",
+  "session_id": "s3",
+  "agent": {
+    "name": "codex",
+    "version": "demo"
+  },
+  "steps": [],
+  "final_metrics": {
+    "total_prompt_tokens": 30000,
+    "total_completion_tokens": 3000,
+    "total_cached_tokens": 6000,
+    "total_cost_usd": 5.92,
+    "total_steps": 5
+  }
+}

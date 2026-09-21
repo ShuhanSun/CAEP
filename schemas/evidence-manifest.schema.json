@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://caep.dev/schema/v0.2/evidence-manifest.json",
+  "title": "CAEP Evidence Manifest v0.2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol_version",
+    "run_id",
+    "artifacts"
+  ],
+  "properties": {
+    "protocol_version": {
+      "const": "0.2-draft"
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "sha256",
+          "role"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "role": {
+            "type": "string"
+          },
+          "required_for_judgment": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "omissions": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    }
+  }
+}

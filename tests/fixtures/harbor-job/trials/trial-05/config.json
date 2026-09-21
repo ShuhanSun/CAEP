@@ -1,0 +1,15 @@
+{
+  "task": {
+    "name": "demo/reliability-task"
+  },
+  "dataset": {
+    "name": "demo-bench",
+    "version": "1.0"
+  },
+  "agent": {
+    "name": "codex"
+  },
+  "model": {
+    "name": "openai/demo-model"
+  }
+}

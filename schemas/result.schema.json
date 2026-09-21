@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://caep.dev/schema/v0.2/result.json",
+  "title": "CAEP Result v0.2",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "protocol_version",
+    "run_id",
+    "success",
+    "reward",
+    "usage"
+  ],
+  "properties": {
+    "protocol_version": {
+      "const": "0.2-draft"
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "success": {
+      "type": "boolean"
+    },
+    "reward": {
+      "type": "object",
+      "required": [
+        "value",
+        "success_threshold"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "success_threshold": {
+          "type": "number"
+        }
+      }
+    },
+    "usage": {
+      "type": "object",
+      "properties": {
+        "total_cost_usd": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "input_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "output_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "cached_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "timing": {
+      "type": "object"
+    }
+  }
+}
