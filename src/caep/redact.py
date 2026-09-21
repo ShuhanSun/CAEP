@@ -8,14 +8,10 @@ _SENSITIVE_KEY = re.compile(
     re.IGNORECASE,
 )
 _ASSIGNMENT = re.compile(r"^\s*([^=]+?)\s*=\s*(.*)$", re.DOTALL)
-_JSON_PAIR = re.compile(
-    r'(["\'])((?:[^\\\n]|\\.)*?)\1(\s*:\s*)(["\'])(.*?)\4',
-    re.IGNORECASE | re.DOTALL,
-)
 _KEY_VALUE = re.compile(
-    r"(?im)^(\s*)([A-Za-z0-9_.-]*"
+    r'(?im)^(\s*)(["\']?)([A-Za-z0-9_.-]*'
     r"(?:api[_-]?key|token|secret|password|auth[_-]?json|credential)"
-    r"[A-Za-z0-9_.-]*)(\s*[:=]\s*)(.+)$"
+    r'[A-Za-z0-9_.-]*)(\2)(\s*[:=]\s*)(.+)$'
 )
 
 
@@ -46,17 +42,15 @@ def redact_json(value: Any) -> Any:
 def redact_text(text: str) -> str:
     """Redact common credential-bearing key/value patterns from text evidence."""
 
-    def replace_json_pair(match: re.Match[str]) -> str:
-        key = match.group(2)
-        if _is_sensitive_key(key):
-            return f'{match.group(1)}{key}{match.group(1)}{match.group(3)}{match.group(4)}<redacted>{match.group(4)}'
-        return match.group(0)
-
     def replace_key_value(match: re.Match[str]) -> str:
-        key = match.group(2)
+        key = match.group(3)
         if _is_sensitive_key(key):
-            return f"{match.group(1)}{key}{match.group(3)}<redacted>"
+            value = match.group(6)
+            stripped = value.strip()
+            replacement = "<redacted>"
+            if len(stripped) >= 2 and stripped[0] in {"'", '"'} and stripped[-1] == stripped[0]:
+                replacement = f"{stripped[0]}<redacted>{stripped[0]}"
+            return f"{match.group(1)}{match.group(2)}{key}{match.group(4)}{match.group(5)}{replacement}"
         return match.group(0)
 
-    text = _JSON_PAIR.sub(replace_json_pair, text)
     return _KEY_VALUE.sub(replace_key_value, text)

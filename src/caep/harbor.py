@@ -308,10 +308,7 @@ def import_harbor_job(job_dir: Path, out_dir: Path, success_threshold: float = 1
             if not src.is_file():
                 return
             original_sha256 = sha256_file(src)
-            try:
-                cleaned = redact_text(src.read_bytes().decode("utf-8", errors="replace"))
-            except Exception:
-                return
+            cleaned = redact_text(src.read_bytes().decode("utf-8", errors="replace"))
             dst = bundle / dst_name
             dst.parent.mkdir(parents=True, exist_ok=True)
             dst.write_text(cleaned, encoding="utf-8")
